@@ -6,6 +6,27 @@ use App\Http\Controllers\Api\SyncController;
 use App\Http\Controllers\Api\VoiceController;
 use Illuminate\Support\Facades\Route;
 
+Route::options('/display/latest-calls', fn () => response('', 204)->withHeaders([
+    'Access-Control-Allow-Origin' => '*',
+    'Access-Control-Allow-Methods' => 'GET, OPTIONS',
+    'Access-Control-Allow-Headers' => 'Content-Type, Authorization, X-Requested-With',
+]));
+Route::options('/display/audio/{logId}', fn () => response('', 204)->withHeaders([
+    'Access-Control-Allow-Origin' => '*',
+    'Access-Control-Allow-Methods' => 'GET, OPTIONS',
+    'Access-Control-Allow-Headers' => 'Content-Type, Authorization, X-Requested-With',
+]));
+Route::options('/display/emergency-audio/{emergencyId}', fn () => response('', 204)->withHeaders([
+    'Access-Control-Allow-Origin' => '*',
+    'Access-Control-Allow-Methods' => 'GET, OPTIONS',
+    'Access-Control-Allow-Headers' => 'Content-Type, Authorization, X-Requested-With',
+]));
+Route::options('/display/announcement-audio/{announcementId}', fn () => response('', 204)->withHeaders([
+    'Access-Control-Allow-Origin' => '*',
+    'Access-Control-Allow-Methods' => 'GET, OPTIONS',
+    'Access-Control-Allow-Headers' => 'Content-Type, Authorization, X-Requested-With',
+]));
+
 // Voice / TTS Routes (proxied from Kashtre settings UI)
 Route::get('/voices', [VoiceController::class, 'index']);
 Route::get('/voice-preview', [VoiceController::class, 'preview']);

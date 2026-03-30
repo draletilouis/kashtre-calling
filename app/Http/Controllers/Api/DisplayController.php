@@ -15,12 +15,30 @@ use Illuminate\Support\Facades\Log;
 
 class DisplayController extends Controller
 {
+    private function corsJson(array $payload, int $status = 200)
+    {
+        return response()->json($payload, $status)->withHeaders([
+            'Access-Control-Allow-Origin' => '*',
+            'Access-Control-Allow-Methods' => 'GET, OPTIONS',
+            'Access-Control-Allow-Headers' => 'Content-Type, Authorization, X-Requested-With',
+        ]);
+    }
+
+    private function withCors($response)
+    {
+        return $response->withHeaders([
+            'Access-Control-Allow-Origin' => '*',
+            'Access-Control-Allow-Methods' => 'GET, OPTIONS',
+            'Access-Control-Allow-Headers' => 'Content-Type, Authorization, X-Requested-With',
+        ]);
+    }
+
     public function latestCalls(Request $request)
     {
         $token = $request->query('token');
 
         if (!$token) {
-            return response()->json(['error' => 'Token required.'], 400);
+            return $this->corsJson(['error' => 'Token required.'], 400);
         }
 
         $caller = Caller::where('display_token', $token)
@@ -28,7 +46,7 @@ class DisplayController extends Controller
             ->first();
 
         if (!$caller) {
-            return response()->json(['error' => 'Invalid or inactive display token.'], 404);
+            return $this->corsJson(['error' => 'Invalid or inactive display token.'], 404);
         }
 
         $query = CallLog::where('caller_id', $caller->id)
@@ -116,7 +134,7 @@ class DisplayController extends Controller
 
         $voiceConfig = VoiceConfiguration::where('business_id', $caller->business_id)->first();
 
-        return response()->json([
+        return $this->corsJson([
             'caller_name'         => $caller->name,
             'logs'                => $logs,
             'queue'               => $queue,
@@ -128,7 +146,7 @@ class DisplayController extends Controller
                 'repeat_interval' => $voiceConfig ? ($voiceConfig->emergency_repeat_interval ?? 5) : 5,
                 'display_duration'=> $voiceConfig ? ($voiceConfig->emergency_display_duration ?? 0) : 0,
             ],
-        ])->header('Access-Control-Allow-Origin', '*');
+        ]);
     }
 
     public function streamAudio(Request $request, int $logId)
@@ -140,7 +158,7 @@ class DisplayController extends Controller
             ->first();
 
         if (!$caller) {
-            return response()->json(['error' => 'Invalid or inactive display token.'], 404);
+            return $this->corsJson(['error' => 'Invalid or inactive display token.'], 404);
         }
 
         $log = CallLog::where('id', $logId)
@@ -148,17 +166,17 @@ class DisplayController extends Controller
             ->first();
 
         if (!$log) {
-            return response()->json(['error' => 'Log not found.'], 404);
+            return $this->corsJson(['error' => 'Log not found.'], 404);
         }
 
         if (!$log->audio_enabled) {
-            return response()->json(['error' => 'Audio disabled for this announcement.'], 422);
+            return $this->corsJson(['error' => 'Audio disabled for this announcement.'], 422);
         }
 
         $config = VoiceConfiguration::where('business_id', $caller->business_id)->first();
 
         if (!$config || !$config->tts_voice_id || !$config->is_active) {
-            return response()->json(['error' => 'TTS not configured or active for this organisation.'], 422);
+            return $this->corsJson(['error' => 'TTS not configured or active for this organisation.'], 422);
         }
 
         $visitId     = $log->visit_id ?? $log->client_name ?? 'Next client';
@@ -169,19 +187,19 @@ class DisplayController extends Controller
         $text = str_replace(['{name}', '{destination}'], [$visitId, $destination], $template);
 
         try {
-            return app(TTSProvider::class)->streamAudio(
+            return $this->withCors(app(TTSProvider::class)->streamAudio(
                 $text,
                 $config->tts_voice_id,
                 $config->tts_stability ?? 0.5,
                 $config->tts_similarity_boost ?? 0.75,
                 $config->tts_speed ?? 1.0
-            );
+            ));
         } catch (\Throwable $e) {
             Log::error('DisplayController::streamAudio failed', [
                 'log_id' => $logId,
                 'error'  => $e->getMessage(),
             ]);
-            return response()->json(['error' => 'Audio generation failed.'], 502);
+            return $this->corsJson(['error' => 'Audio generation failed.'], 502);
         }
     }
 
@@ -194,7 +212,7 @@ class DisplayController extends Controller
             ->first();
 
         if (!$caller) {
-            return response()->json(['error' => 'Invalid or inactive display token.'], 404);
+            return $this->corsJson(['error' => 'Invalid or inactive display token.'], 404);
         }
 
         $alert = EmergencyAlert::where('id', $emergencyId)
@@ -202,13 +220,13 @@ class DisplayController extends Controller
             ->first();
 
         if (!$alert) {
-            return response()->json(['error' => 'Emergency alert not found.'], 404);
+            return $this->corsJson(['error' => 'Emergency alert not found.'], 404);
         }
 
         $config = VoiceConfiguration::where('business_id', $caller->business_id)->first();
 
         if (!$config || !$config->is_active) {
-            return response()->json(['error' => 'TTS not configured or active for this organisation.'], 422);
+            return $this->corsJson(['error' => 'TTS not configured or active for this organisation.'], 422);
         }
 
         // Use emergency-specific voice if configured, fall back to regular voice
@@ -218,26 +236,26 @@ class DisplayController extends Controller
         $speed           = $config->emergency_tts_speed             ?? $config->tts_speed            ?? 1.0;
 
         if (!$voiceId) {
-            return response()->json(['error' => 'TTS not configured or active for this organisation.'], 422);
+            return $this->corsJson(['error' => 'TTS not configured or active for this organisation.'], 422);
         }
 
         try {
             $destination = $alert->service_point_name ?? 'the area';
             $message     = str_replace('{destination}', $destination, $alert->message);
 
-            return app(TTSProvider::class)->streamAudio(
+            return $this->withCors(app(TTSProvider::class)->streamAudio(
                 $message,
                 $voiceId,
                 $stability,
                 $similarityBoost,
                 $speed
-            );
+            ));
         } catch (\Throwable $e) {
             Log::error('DisplayController::streamEmergencyAudio failed', [
                 'emergency_id' => $emergencyId,
                 'error'        => $e->getMessage(),
             ]);
-            return response()->json(['error' => 'Audio generation failed.'], 502);
+            return $this->corsJson(['error' => 'Audio generation failed.'], 502);
         }
     }
 
@@ -250,7 +268,7 @@ class DisplayController extends Controller
             ->first();
 
         if (!$caller) {
-            return response()->json(['error' => 'Invalid or inactive display token.'], 404);
+            return $this->corsJson(['error' => 'Invalid or inactive display token.'], 404);
         }
 
         $announcement = Announcement::where('id', $announcementId)
@@ -258,29 +276,29 @@ class DisplayController extends Controller
             ->first();
 
         if (!$announcement) {
-            return response()->json(['error' => 'Announcement not found.'], 404);
+            return $this->corsJson(['error' => 'Announcement not found.'], 404);
         }
 
         $config = VoiceConfiguration::where('business_id', $caller->business_id)->first();
 
         if (!$config || !$config->tts_voice_id || !$config->is_active) {
-            return response()->json(['error' => 'TTS not configured or active for this organisation.'], 422);
+            return $this->corsJson(['error' => 'TTS not configured or active for this organisation.'], 422);
         }
 
         try {
-            return app(TTSProvider::class)->streamAudio(
+            return $this->withCors(app(TTSProvider::class)->streamAudio(
                 $announcement->message,
                 $config->tts_voice_id,
                 $config->tts_stability ?? 0.5,
                 $config->tts_similarity_boost ?? 0.75,
                 $config->tts_speed ?? 1.0
-            );
+            ));
         } catch (\Throwable $e) {
             Log::error('DisplayController::streamAnnouncementAudio failed', [
                 'announcement_id' => $announcementId,
                 'error'           => $e->getMessage(),
             ]);
-            return response()->json(['error' => 'Audio generation failed.'], 502);
+            return $this->corsJson(['error' => 'Audio generation failed.'], 502);
         }
     }
 }

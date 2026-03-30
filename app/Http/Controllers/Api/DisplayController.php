@@ -117,6 +117,8 @@ class DisplayController extends Controller
             'message'            => $activeEmergency->message,
             'display_message'    => $activeEmergency->display_message ?? $activeEmergency->message,
             'service_point_name' => $activeEmergency->service_point_name,
+            'room_name'          => $activeEmergency->room_name,
+            'color'              => $activeEmergency->color ?? 'red',
             'triggered_at'       => $activeEmergency->triggered_at->format('H:i:s'),
         ] : null;
 
@@ -240,7 +242,7 @@ class DisplayController extends Controller
         }
 
         try {
-            $destination = $alert->service_point_name ?? 'the area';
+            $destination = $alert->room_name ?: ($alert->service_point_name ?: 'the area');
             $message     = str_replace('{destination}', $destination, $alert->message);
 
             return $this->withCors(app(TTSProvider::class)->streamAudio(

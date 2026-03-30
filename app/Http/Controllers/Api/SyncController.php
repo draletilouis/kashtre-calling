@@ -184,6 +184,7 @@ class SyncController extends Controller
         $validated = $request->validate([
             'business_id'        => 'required|integer',
             'service_point_name' => 'nullable|string',
+            'room_name'          => 'nullable|string',
             'message'            => 'required|string',
             'display_message'    => 'nullable|string',
             'color'              => 'nullable|string',
@@ -198,8 +199,10 @@ class SyncController extends Controller
         $alert = EmergencyAlert::create([
             'business_id'        => $validated['business_id'],
             'service_point_name' => $validated['service_point_name'],
+            'room_name'          => $validated['room_name'] ?? null,
             'message'            => $validated['message'],
             'display_message'    => $validated['display_message'] ?? null,
+            'color'              => $validated['color'] ?? 'red',
             'is_active'          => true,
             'triggered_at'       => $validated['triggered_at'],
         ]);
